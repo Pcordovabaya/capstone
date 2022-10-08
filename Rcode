@@ -1,0 +1,443 @@
+---
+title: "Capstone-Google"
+author: "Pablo"
+date: "2022-09-08"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+#libraries:
+```{r libraries}
+library(tidyverse)
+library(lubridate)
+library(ggplot2) 
+getwd() 
+library(hms)
+library(data.table)
+
+```
+#Uploading datasets (CSV files)
+```{r }
+##setting the new directory
+setwd("\\Users\\Pablo\\Documents\\Google_Capstone")
+getwd()
+
+##uploading the files
+
+aug21_1<-read.csv("202108-divvy-tripdata.csv")
+sep21_2<-read.csv("202109-divvy-tripdata.csv")
+oct21_3<-read.csv("202110-divvy-tripdata.csv")
+nov21_4<-read.csv("202111-divvy-tripdata.csv")
+dic21_5<-read.csv("202112-divvy-tripdata.csv")
+jan22_6<-read.csv("202201-divvy-tripdata.csv")
+feb22_7<-read.csv("202202-divvy-tripdata.csv")
+mar22_8<-read.csv("202203-divvy-tripdata.csv")
+apr22_9<-read.csv("202204-divvy-tripdata.csv")
+may22_10<-read.csv("202205-divvy-tripdata.csv")
+jun22_11<-read.csv("202206-divvy-tripdata.csv")
+jul22_12<-read.csv("202207-divvy-tripdata.csv")
+```
+#Merging all the data into one
+```{r}
+all_trips<-bind_rows(aug21_1,sep21_2,oct21_3,nov21_4,dic21_5,jan22_6,feb22_7,mar22_8,apr22_9,may22_10,jun22_11,jul22_12)
+
+
+colnames(all_trips)  #List of column names
+nrow(all_trips)  #How many rows are in data frame?
+dim(all_trips)  #Dimensions of the data frame?
+head(all_trips)  #See the first 6 rows of data frame.  Also tail(all_trips)
+str(all_trips)  #See list of columns and data types (numeric, character, etc)
+summary(all_trips)  #Statistical summary of data. Mainly for numerics
+
+```
+#Create a new df to modify and keep the other as backup
+```{r}
+all_rides<-all_trips
+```
+##press control L to clear console
+
+##create a new column with the length of the ride V1 (ended_at-started_at) no utilizado porque no sirvió, al parecer debido a que esas columnas ended_at y started_at son char y no time, por eso se utiliza tra funcion
+```{r}
+all_rides$ride_length <-difftime(all_trips$ended_at, all_trips$started_at,units = "mins")
+```
+
+##create a new column with the length of the ride V2. this one works (thanks to strptime). 
+
+```{r}
+all_rides$ride_length <- difftime(as.POSIXct(strptime(all_rides$ended_at, "%Y-%m-%d %H:%M:%OS")), as.POSIXct(strptime(all_rides$started_at, "%Y-%m-%d %H:%M:%OS")), unit = "mins")
+```
+
+
+##eliminar una columna
+```{r }
+all_rides$ride_length <- NULL
+```
+##eliminar las columnas no deseadas
+```{r }
+all_rides <- all_rides %>%
++ select(-c(start_lat, start_lng, end_lat, end_lng, start_station_id,end_station_id, end_station_name))
+```
+##Create columns for different seasons:
+```{r}
+all_rides <- all_rides %>% mutate(season = case_when(month == "03" ~"Spring",month == "04" ~"Spring",month == "05" ~"Spring", month == "06" ~"Summer", month == "07" ~"Summer", month == "08" ~"Summer", month == "09" ~"Fall", month == "10" ~"Fall", month == "11" ~"Fall", month == "12" ~"Winter", month == "01" ~"Winter",month == "02" ~"Winter"))
+```
+## create columns for date, month, year,hour....
+```{r}
+all_rides$date <- as.Date(all_rides$started_at)
+all_rides$month <- format(as.Date(all_rides$date), "%m")
+all_rides$day <- format(as.Date(all_rides$date), "%d")
+all_rides$year <- format(as.Date(all_rides$date), "%Y")
+all_rides$day_of_week <- format(as.Date(all_rides$date), "%A")
+all_rides$date <- strptime(all_rides$started_at, "%Y-%m-%d %H:%M:%OS")
+View(all_rides[[7]][[1]])
+all_rides$time <- format(as.Date(all_rides$date), "%H:%M:%S")
+all_rides$time2 <- as_hms((all_rides$time))
+all_rides$time3 <- format(all_rides$date, format= "%H:%M")
+all_rides$hour <- format(all_rides$date, format= "%H")
+```
+##create a column for different times_of_day: Night, Morning, Afternoon, Evening
+```{r}
+all_rides <-all_rides %>% mutate(time_of_day = case_when(hour=="00" ~ "Night",hour == "01" ~ "Night",hour == "02" ~ "Night",hour == "03" ~ "Night",hour == "04" ~ "Night",hour == "05" ~ "Night", hour == "06" ~ "Morning",hour == "07" ~ "Morning", hour == "08" ~ "Morning",hour == "09" ~ "Morning",hour == "10" ~ "Morning", hour == "11" ~ "Morning",hour == "12" ~ "Afternoon", hour == "13" ~ "Afternoon", hour == "14" ~ "Afternoon",hour == "15" ~ "Afternoon",hour == "16" ~ "Afternoon",hour == "17" ~ "Afternoon", hour == "18" ~ "Evening",hour == "19" ~ "Evening",hour == "20" ~ "Evening", hour == "21" ~ "Evening", hour == "22" ~ "Evening", hour == "23" ~ "Evening"))
+```
+##Clean data procedure
+```{r}
+all_rides$time <- NULL
+all_rides$time2 <- NULL
+all_rides$time3 <- NULL
+all_rides <- na.omit(all_rides)#remove rows with NA values
+all_rides <- distinct(all_rides)#remove duplicate rows
+all_rides <- all_rides[!(all_rides$ride_length <=0),] #remove where ride_length is 0 or negative
+
+##not used (remove columns not needed: ride_id, start_station_id, end_station_id, start_lat, start_long, end_lat, end_lng):
+cyclistic_date <- cyclistic_date %>%  
+  select(-c(ride_id, start_station_id, end_station_id,start_lat,start_lng,end_lat,end_lng))
+```
+##Reports:
+```{r}
+#total number of rides
+nrow(all_rides)
+# number of casual and members:
+all_rides %>%
++ group_by(member_casual) %>%
++ count(member_casual)
+#number of different types of bikes:
+all_rides %>%
++ group_by(rideable_type) %>%
++ count(rideable_type)
+
+##number of different types of bikes by member or casual
+all_rides %>%
++ group_by(member_casual,rideable_type) %>%
++ count(rideable_type)
+##total rides by member type in each hour
+all_rides %>%
++ group_by(member_casual) %>%
++ count(hour) %>%
++ print(n = 48) ##this lets u view the entire tibble
+##total rides
+> all_rides %>%
++ count(hour)
+```
+##morning Reports:
+```{r}
+#morning total rides by member type:
+all_rides %>%
++ filter(time_of_day) %>%
++ count(time_of_day)
+#total morning rides
+all_rides %>%
++ filter(time_of_day == "Morning") %>%
++ count(time_of_day)
+```
+##afternoon Reports:
+```{r}
+#total rides by member type
+all_rides %>%
++ group_by(member_casual) %>%
++ filter(time_of_day == "Afternoon") %>%
++ count(time_of_day)
+##total afternoon rides
+all_rides %>%
++ filter(time_of_day == "Afternoon") %>%
++ count(time_of_day)
+```
+##evening reports
+```{r}
+##total rides (evening) by member type
+ all_rides %>%
++ group_by(member_casual) %>%
++ filter(time_of_day == "Evening") %>%
++ count(time_of_day)
+##total evening rides
+all_rides %>%
++ filter(time_of_day == "Evening") %>%
++ count(time_of_day)
+```
+
+##all times of day reports
+```{r}
+##all rides by member type and time of day
+all_rides %>%
++ group_by(member_casual) %>%
++ count(time_of_day)
+##total number of rides by time of day
+all_rides %>%
++ group_by(time_of_day) %>%
++ count(time_of_day)
+
+```
+##Days of the week
+```{r}
+##total rides by member type and day (mon, tues,wed...)
+all_rides %>%
++ group_by(member_casual) %>%
++ count(day_of_week)
+##total rides by day
+all_rides %>%
++ count(day_of_week)
+```
+
+##Days of the month
+```{r}
+##total rides per day of the month by member type
+all_rides %>%
++ group_by(member_casual) %>%
++ count(day) %>%
++ print(n = 62)
+##total rides per day of the month
+all_rides %>%
++ count(day)
+```
+##reports by season
+```{r}
+##spring reports by member type
+all_rides %>%
++ group_by(member_casual) %>%
++ filter(season == "Spring") %>%
++ count(season)
+##total rides on spring
+all_rides %>%
++ filter(season == "Spring") %>%
++ count(season)
+##summer report by member type
+all_rides %>%
++ group_by(member_casual) %>%
++ filter(season == "Summer") %>%
++ count(season)
+##total rides on summer
+all_rides %>%
++ filter(season == "Summer") %>%
++ count(season)
+##Fall reports by member type
+all_rides %>%
++ group_by(member_casual) %>%
++ filter(season == "Fall") %>%
++ count(season)
+##total rides on Fall
+all_rides %>%
++ filter(season == "Fall") %>%
++ count(season)
+##Winter reports by member type
+all_rides   %>%
++ group_by(member_casual) %>%
++ filter(season == "Winter") %>%
++ count(season)
+##total rides on Winter
+all_rides %>%
++ filter(season == "Winter") %>%
++ count(season)
+##All seasons reports by type
+all_rides %>%
+  group_by(season, member_casual) %>%
+  count(season)
+##total rides by season
+all_rides %>%
+  group_by(season) %>%
+  count(season)
+```
+##Average ride length
+```{r}
+##average of ride_length
+average_ride <- mean(all_rides$ride_length)
+print(average_ride)
+##average ride_length
+all_rides %>%
+  group_by(member_casual) %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+```
+##Type of Bike
+```{r}
+##average time by member type and rideable_type 
+all_rides %>%
+  group_by(member_casual, rideable_type) %>%
+  summarise_at(vars(ride_length), list(time = mean))
+##average time by rideable_type 
+all_rides %>%
+  group_by(rideable_type) %>%
+  summarise_at(vars(ride_length), list(time = mean))
+```
+##HOUR
+```{r}
+##average time by hour(0,1,2,3...23) and by member type
+all_rides %>%
+  group_by(hour, member_casual) %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+##average time by hour(0,1,2,3...23)
+all_rides %>%
+  group_by(hour) %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+```
+
+##time of day
+###Morning
+```{r}
+##average ride length by member type at morning
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(time_of_day == "Morning") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+##average ride length at morning
+all_rides %>%
+  filter(time_of_day == "Morning") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+```
+###Afternoon
+```{r}
+##average ride length by member type at afternoon
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(time_of_day == "Afternoon") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+##average ride length at afternoon
+all_rides %>%
+  filter(time_of_day == "Afternoon") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+```
+###evening
+```{r}
+##average ride length by member type at Evening
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(time_of_day == "Evening") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+##average ride length at Evening
+all_rides %>%
+  filter(time_of_day == "Evening") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+```
+###Night
+```{r}
+##average ride length by member type at Evening
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(time_of_day == "Night") %>%
+  summarise_at(vars(ride_length), list(time_promedio = mean))
+##average ride length at Evening
+all_rides %>%
+  filter(time_of_day == "Night") %>%
+  summarise_at(vars(ride_length), list(promedio_noche = mean))
+```
+###all times of day
+```{r}
+##average ride_length by member type and by time_of_day
+all_rides %>%
+  group_by(member_casual, time_of_day) %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##average ride_length by time_of_day
+
+all_rides %>%
+  group_by(time_of_day) %>%
+  summarise_at(vars(ride_length),list(promedio = mean))
+  
+```
+##Day of the week
+```{r}
+##average ride_length by member type and by day_of_week (mon,tue...)
+all_rides %>%
+  group_by(member_casual, day_of_week) %>%
+  summarise_at(vars(ride_length),list(promedio = mean))
+##average ride_length by day_of_week
+all_rides %>% group_by(day_of_week) %>%
+  summarise_at(vars(ride_length),list(promedio = mean))
+```
+##Day of the month
+```{r}
+##average ride_length by day of month(1,2,3..30,31) and by member type
+all_rides %>%
+  group_by(day, member_casual) %>%
+  summarise_at(vars(ride_length),list(promedio = mean)) %>%
+  print(n=62)
+##average ride_length by day of month
+all_rides %>%
+  group_by(day) %>%
+  summarise_at(vars(ride_length),list(promedio = mean)) %>%
+  print(n=31)
+
+```
+##Month
+```{r}
+##average ride_length by member type and month
+all_rides %>%
+  group_by(month, member_casual) %>%
+  summarise_at(vars(ride_length),list(promedio = mean)) %>%
+  print(n=24)
+##average ride_length by month
+all_rides %>%
+  group_by(month) %>%
+  summarise_at(vars(ride_length),list(promedio = mean)) %>%
+  print(n=24)
+```
+##Season
+```{r}
+##Average ride length by member type in Spring
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(season == "Spring") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length in spring
+all_rides %>%
+  filter(season == "Spring") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length by member type in Summer
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(season == "Summer") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length in Summer
+all_rides %>%
+  filter(season == "Summer") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length by member type in Fall
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(season == "Fall") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length in Fall
+all_rides %>%
+  filter(season == "Fall") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length by member type in Winter
+all_rides %>%
+  group_by(member_casual) %>%
+  filter(season == "Winter") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+##Average ride length in Winter
+all_rides %>%
+  filter(season == "Winter") %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+
+##average ride_length at each season by member type
+all_rides %>%
+  group_by(season, member_casual) %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+
+##average ride_length by season
+all_rides %>%
+  group_by(season) %>%
+  summarise_at(vars(ride_length), list(promedio = mean))
+```
+
+
+
